@@ -2,7 +2,7 @@
   import type { Device } from '../types/Device';
   import DeviceIcons from '../icons/DeviceIcons.svelte';
   import { openModal } from '../stores/modal';
-  import { createBackup } from '../api';
+  import { createBackup, hasFullBackup } from '../api';
   import { addToast as showToast } from '../stores/toast';
   import { getDeviceNameFromModel } from '../utils/formatters';
   import { activeTasksByDevice } from '../stores/tasks';
@@ -13,9 +13,10 @@
   // Check if this device has an active task
   $: hasActiveTask = $activeTasksByDevice.has(device.serial);
 
-  function handleQuickBackup() {
+  async function handleQuickBackup() {
     if (device.available && !hasActiveTask) {
-      createBackup(device.serial, false)
+      const full = !await hasFullBackup(device.serial);
+      createBackup(device.serial, full)
         .then(() => {
           showToast('Backup started', 'success');
         })
@@ -75,7 +76,7 @@
           class="text-green-600 hover:text-green-800 text-sm font-medium"
           on:click|stopPropagation={handleQuickBackup}
         >
-          Quick Backup
+          Backup
         </button>
       {/if}
     {/if}
