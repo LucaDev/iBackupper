@@ -57,6 +57,7 @@
           <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
           <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
           <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+          <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Details</th>
           <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
         </tr>
       </thead>
@@ -71,8 +72,18 @@
                 class:text-green-800={backup.status === 'success'}
                 class:bg-red-100={backup.status !== 'success'} 
                 class:text-red-800={backup.status !== 'success'}>
-                {backup.status}
+                {backup.status.toUpperCase()}
               </span>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+              <details>
+                <summary class="cursor-pointer text-primary-600">View Details</summary>
+                <div class="mt-2 text-xs">
+                  <p><span class="font-medium">ID:</span> {backup.id}</p>
+                  <p><span class="font-medium">Version:</span> {backup.version}</p>
+                  <p><span class="font-medium">Backup State:</span> {backup.backup_state}</p>
+                </div>
+              </details>
             </td>
             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
               {#if device.available}

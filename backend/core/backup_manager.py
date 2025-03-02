@@ -23,7 +23,9 @@ from backend.utils.helpers import (
     get_backup_ids,
     get_timestamp_str,
     read_metadata,
-    write_metadata
+    write_metadata,
+    parse_status_plist,
+    get_all_backup_dirs
 )
 
 logger = logging.getLogger(__name__)
@@ -310,7 +312,7 @@ class BackupManager:
     @staticmethod
     async def get_backups(serial: str) -> List[Dict[str, Any]]:
         """
-        Get a list of all backups for a device.
+        Get a list of all backups for a device by reading Status.plist files.
         
         Args:
             serial: The device serial number
@@ -319,8 +321,57 @@ class BackupManager:
             List of dictionaries containing backup information
         """
         try:
-            metadata = read_metadata(serial)
-            return metadata.get("backups", [])
+            backups = []
+            backup_dirs = get_all_backup_dirs().get(serial, [])
+            
+            for backup_id in backup_dirs:
+                # Parse Status.plist
+                status_data = parse_status_plist(serial, backup_id)
+                if status_data:
+                    # Create backup info from Status.plist
+                    backup_info = {
+                        "path": str(get_backup_path(serial, backup_id)),
+                    }
+                    
+                    # Map Status.plist fields to our backup info
+                    if "Date" in status_data:
+                        # Try to parse the date string
+                        try:
+                            date_obj = datetime.strptime(status_data["Date"], "%a %b %d %H:%M:%S %Z %Y")
+                            backup_info["timestamp"] = date_obj.isoformat()
+                        except Exception:
+                            # If parsing fails, use the string as is
+                            backup_info["timestamp"] = status_data["Date"]
+                    
+                    # Map SnapshotState to status
+                    if "SnapshotState" in status_data:
+                        if status_data["SnapshotState"] == "finished":
+                            backup_info["status"] = "success"
+                        else:
+                            backup_info["status"] = "failed"
+                    
+                    # Map IsFullBackup
+                    if "IsFullBackup" in status_data:
+                        backup_info["full"] = status_data["IsFullBackup"]
+                    
+                    # Add UUID
+                    if "UUID" in status_data:
+                        backup_info["id"] = status_data["UUID"]
+                    
+                    # Add Version
+                    if "Version" in status_data:
+                        backup_info["version"] = status_data["Version"]
+                    
+                    # Add BackupState
+                    if "BackupState" in status_data:
+                        backup_info["backup_state"] = status_data["BackupState"]
+                    
+                    backups.append(backup_info)
+            
+            # Sort backups by timestamp (newest first)
+            backups.sort(key=lambda x: x["timestamp"], reverse=True)
+            
+            return backups
         except Exception as e:
             logger.error(f"Error getting backups for device {serial}: {str(e)}")
             return []
@@ -328,7 +379,7 @@ class BackupManager:
     @staticmethod
     async def get_backup_info(serial: str, backup_id: str) -> Optional[Dict[str, Any]]:
         """
-        Get information for a specific backup.
+        Get information for a specific backup by reading its Status.plist.
         
         Args:
             serial: The device serial number
@@ -338,11 +389,54 @@ class BackupManager:
             Dictionary containing backup information or None if backup not found
         """
         try:
-            metadata = read_metadata(serial)
-            for backup in metadata.get("backups", []):
-                if backup["id"] == backup_id:
-                    return backup
-            return None
+            # Parse Status.plist
+            status_data = parse_status_plist(serial, backup_id)
+            if not status_data:
+                return None
+            
+            # Create backup info from Status.plist
+            backup_info = {
+                "id": backup_id,
+                "timestamp": datetime.now().isoformat(),  # Default timestamp
+                "status": "success",  # Default status
+                "path": str(get_backup_path(serial, backup_id)),
+                "type": "mobilebackup2"
+            }
+            
+            # Map Status.plist fields to our backup info
+            if "Date" in status_data:
+                # Try to parse the date string
+                try:
+                    date_obj = datetime.strptime(status_data["Date"], "%a %b %d %H:%M:%S %Z %Y")
+                    backup_info["timestamp"] = date_obj.isoformat()
+                except Exception:
+                    # If parsing fails, use the string as is
+                    backup_info["timestamp"] = status_data["Date"]
+            
+            # Map SnapshotState to status
+            if "SnapshotState" in status_data:
+                if status_data["SnapshotState"] == "finished":
+                    backup_info["status"] = "success"
+                else:
+                    backup_info["status"] = "failed"
+            
+            # Map IsFullBackup
+            if "IsFullBackup" in status_data:
+                backup_info["full"] = status_data["IsFullBackup"]
+            
+            # Add UUID
+            if "UUID" in status_data:
+                backup_info["uuid"] = status_data["UUID"]
+            
+            # Add Version
+            if "Version" in status_data:
+                backup_info["version"] = status_data["Version"]
+            
+            # Add BackupState
+            if "BackupState" in status_data:
+                backup_info["backup_state"] = status_data["BackupState"]
+            
+            return backup_info
         except Exception as e:
             logger.error(f"Error getting backup info for device {serial}, backup {backup_id}: {str(e)}")
             return None

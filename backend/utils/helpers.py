@@ -2,7 +2,9 @@
 Utility helper functions for the iBackupper application.
 """
 import json
+import logging
 import os
+import plistlib
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
@@ -145,3 +147,59 @@ def get_backup_ids(serial: str) -> List[str]:
         return []
     
     return [d.name for d in backups_dir.iterdir() if d.is_dir()]
+
+
+def parse_status_plist(serial: str, backup_id: str) -> Optional[Dict[str, Any]]:
+    """
+    Parse the Status.plist file for a specific backup.
+    
+    Args:
+        serial: The device serial number
+        backup_id: The backup ID (timestamp)
+        
+    Returns:
+        Dictionary containing Status.plist information or None if file not found
+    """
+    logger = logging.getLogger(__name__)
+    
+    # Get backup path
+    backup_dir = get_backup_path(serial, backup_id)
+    status_path = backup_dir / "Status.plist"
+    
+    if not status_path.exists():
+        print(status_path)
+        logger.warning(f"Status.plist not found for device {serial}, backup {backup_id}")
+        return None
+    
+    try:
+        with open(status_path, 'rb') as f:
+            status_data = plistlib.load(f)
+        return status_data
+    except Exception as e:
+        logger.error(f"Error parsing Status.plist for device {serial}, backup {backup_id}: {str(e)}")
+        return None
+
+
+def get_all_backup_dirs() -> Dict[str, List[str]]:
+    """
+    Get all backup directories organized by device serial.
+    
+    Returns:
+        Dictionary mapping device serials to lists of backup IDs
+    """
+    result = {}
+    
+    if not FIXED_BACKUP_DIR.exists():
+        return result
+    
+    # Iterate through device directories
+    for device_dir in FIXED_BACKUP_DIR.iterdir():
+        if device_dir.is_dir():
+            serial = device_dir.name
+            result[serial] = []
+            
+            # For now, we're just adding the device directory itself as a backup
+            # since the structure seems to be FIXED_BACKUP_DIR/serial/
+            result[serial].append(serial)
+    
+    return result
