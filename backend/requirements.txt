@@ -1,0 +1,6 @@
+fastapi==0.115.1
+uvicorn==0.34.0
+pydantic==2.10.6
+apscheduler==3.11.0
+pymobiledevice3==4.20.14
+python-multipart==0.0.20
